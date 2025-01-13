@@ -1,7 +1,8 @@
 from numba import njit
+import numpy as np
+import threading
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import  as_completed
 import nltk
 import os
 
@@ -34,14 +35,34 @@ class BM25:
         # Key: token, Value: Word
         self.words = {}
         self.WORKER_THREADS = 10
+    def collect_words(self):
     def ext_metrics(self, file_path):
+        rem_specials = lambda w: [c for c in w if w.isalnum()]
+        vec_rem_sp = np.vectorize(rem_specials)
         with open(file_path) as file:
+            # Store words and its count
+            words={}
+            # Read file
             data = file.read()
-            nltk.word_tokenize(data)
+            # Tokenize entire text into words
+            word_ls = np.array(nltk.word_tokenize(data))
+            # Remove all non-alnum characters
+            word_ls = wordls[word_ls.isalnum()]
+            # Remove special characters within the words
+            word_ls = vec_rem_sp(word_ls)
+            # Count all the unique words in the count
+            unique_words, counts = np.unique(word_ls, return_counts=True)
+            # Assign each word and its count in the return var
+            for index,word in enumerate(unique_words):
+                words[word] = self.words.get(word, [])
+                words[word].append(counts[index])
+            return words
     def ext_docs(self):
+        # Create a thread to execute collection of words and its counts
+        thread = threading.Thread(target = self.collect_words, daemon=True).start()
         # Execute multiple threads
         with ThreadPoolExecutor(self.WORKER_THREADS) as executor:
-            tasks = executor.map()
+            results = executor.map(self.ext_metrics, *self.files)
     def idf(self, qi, N):
         pass
     def bm25(self, qi, d, k1, b):
