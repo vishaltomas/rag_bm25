@@ -24,7 +24,7 @@ def _safety_import_():
 @dataclass
 class Word:
     """Contains name of the word its frequency and inverse frequency across documents"""
-    name: str
+    name: str 
     freq: int = 0
     ifreq: int = 0 
     
@@ -54,6 +54,7 @@ class BM25:
             unique_words, counts = np.unique(word_ls, return_counts=True)
             # Assign each word and its count in the return var
             for index,word in enumerate(unique_words):
+                word = word.lower()
                 words[word] = self.words.get(word, [])
                 words[word].append(counts[index])
             return words
@@ -63,7 +64,34 @@ class BM25:
         # Execute multiple threads
         with ThreadPoolExecutor(self.WORKER_THREADS) as executor:
             results = executor.map(self.ext_metrics, *self.files)
-    def idf(self, qi, N):
-        pass
-    def bm25(self, qi, d, k1, b):
-        pass    
+    def __idf(self, qi:str, N:int):
+        # Calculting inverse document frequency
+        nqi = len(self.words.get(qi.lower(), Word()).doc)
+        return np.log((N-nqi+0.5)/(nqi+0.5)+1)
+    def __bm25(self, qi:int, d:int, k1:float, b:float, N:int, davgl:float):
+        # Calculating BM25 score for each qi
+        # For each qi(that is word 'i' in the query) score is calculated
+        # later at the time of retreival, scores of each qi is summed up
+        word_ls = self.words.keys()
+        fqi = self.words[qi.lower()].freq[d] if qi in word_ls else 0
+        idf = self.words[qi.lower()].idf if qi in word_ls else 0
+        return idf*fqi*(k1+1)/(fqi + k1*(1-b+b*d/davgl))
+    def store_index(self):
+        # store the values in a file which is suitable for fast retreival and 
+    def calc_scores(self, k1, b):
+        # self.words contains words as keys and Word(name, freq:list, doc:list, doclen:list, bm25:list, idf:float) as values
+        # For faster calculations, intialize array with numpy
+        arr = np.array(self.words.values())
+        # Calculate idf for each words and BM25 for each words w.r.t each documents
+        def idf_bm25calc(word_obj):
+            qi = word_obj.name.lower()
+            doclen = word_obj.doclen
+            N =  len(self.files)
+            freq = word_obj.freq
+            word_obj.idf = self.__idf(qi,N)
+            word_obj.bm25 = [self.__bm25(qi, doclen[i], k1, b, N, avg(doclen)) for i,f in freq]
+            return None
+        idf_bm25_calc_vec = np.vectorize(idf_bm25_calc)
+        idf_bm25_calc_vec(arr)
+        
+        
