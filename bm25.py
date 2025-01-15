@@ -83,11 +83,7 @@ class BM25:
         if not (sum[results] == len(self.files)):
             print("Not all files are executed properly")
         self.words_queue.join()
-
-    def idf(self, qi, N):
-        pass
-    def bm25(self, qi, d, k1, b):
-        pass    
+            
     def __idf(self, qi:str, N:int):
         # Calculting inverse document frequency
         nqi = len(self.words.get(qi.lower(), Word()).doc)
@@ -102,12 +98,13 @@ class BM25:
         return idf*fqi*(k1+1)/(fqi + k1*(1-b+b*d/davgl))
     def store_index(self):
         # store the values in a file which is suitable for fast retreival and 
+        pass
     def calc_scores(self, k1, b):
         # self.words contains words as keys and Word(name, freq:list, doc:list, doclen:list, bm25:list, idf:float) as values
         # For faster calculations, intialize array with numpy
         arr = np.array(self.words.values())
         # Calculate idf for each words and BM25 for each words w.r.t each documents
-        def idf_bm25calc(word_obj):
+        def idf_bm25_calc(word_obj):
             qi = word_obj.name.lower()
             doclen = word_obj.doclen
             N =  len(self.files)
