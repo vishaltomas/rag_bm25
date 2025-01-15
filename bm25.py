@@ -24,10 +24,13 @@ def _safety_import_():
 
 @dataclass
 class Word:
-    """Contains name of the word its frequency and inverse frequency across documents"""
-    name: str 
+    """Contains name of the word, its frequency and inverse frequency across documents"""
+    name: str = ""
     freq: int = 0
     doc: list = []
+    doclen: list = []
+    idf: int = 0
+    bm25: list = []
     
 class BM25:
     def __init__(self, num_docs, file_ls):
@@ -38,13 +41,15 @@ class BM25:
         self.words_queue = Queue()
         self.WORKER_THREADS = 10
     def collect_words(self):
-        while True:
-            words, doc = self.words_queue.get()
+        while not self.thread_event.is_set():
+            words, doc, doclen = self.words_queue.get()
+            self.words[word] = self.words.get(word, Word())
             for word in words.keys():
                 self.words[word] = Word(
                     name=word,
                     freq=self.words[word].freq + sum(words[word]),
-                    doc=self.words[word].doc + [doc]
+                    doc=self.words[word].doc + [doc],
+                    doclen=self.words[word].doclen + [doclen]
                 )
             self.words_queue.task_done()
 
@@ -59,6 +64,7 @@ class BM25:
             data = file.read()
             # Tokenize entire text into words
             word_ls = np.array(nltk.word_tokenize(data))
+            doclen = len(word_ls)
             # Remove all non-alnum characters
             word_ls = word_ls[word_ls.isalnum()]
             # Remove special characters within the words
@@ -68,14 +74,13 @@ class BM25:
             # Assign each word and its count in the return var
             for index,word in enumerate(unique_words):
                 word = word.lower()
-                words[word] = self.words.get(word, [])
-                words[word].append(counts[index])
-            self.words_queue.put((words, file_name))
+                words[word] = counts[index]
+            self.words_queue.put((words, file_name, doclen))
             return True
     def ext_docs(self):
         # Create a thread to execute collection of words and its counts
         thread = threading.Thread(target = self.collect_words, daemon=True)
-        self.thread
+        self.thread_event = threading.Event()
         thread.start()
         # Execute multiple threads
         with ThreadPoolExecutor(self.WORKER_THREADS) as executor:
@@ -83,6 +88,8 @@ class BM25:
         if not (sum[results] == len(self.files)):
             print("Not all files are executed properly")
         self.words_queue.join()
+        self.thread_event.set()
+        thread.join()
             
     def __idf(self, qi:str, N:int):
         # Calculting inverse document frequency
@@ -97,7 +104,7 @@ class BM25:
         idf = self.words[qi.lower()].idf if qi in word_ls else 0
         return idf*fqi*(k1+1)/(fqi + k1*(1-b+b*d/davgl))
     def store_index(self):
-        # store the values in a file which is suitable for fast retreival and 
+        # store the values in a file which is suitable for fast retreival and updating the data
         pass
     def calc_scores(self, k1, b):
         # self.words contains words as keys and Word(name, freq:list, doc:list, doclen:list, bm25:list, idf:float) as values
