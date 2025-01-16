@@ -6,6 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 import nltk
 import os
 from queue import Queue
+from radix import RadixNode, RadixTree
+from math import avg
 
 def _safety_import_():
     # Check whether imported modules work fine
@@ -105,7 +107,9 @@ class BM25:
         return idf*fqi*(k1+1)/(fqi + k1*(1-b+b*d/davgl))
     def store_index(self):
         # store the values in a file which is suitable for fast retreival and updating the data
-        pass
+        rt = RadixTree()
+        rt.insert(list(self.word.keys()))
+        
     def calc_scores(self, k1, b):
         # self.words contains words as keys and Word(name, freq:list, doc:list, doclen:list, bm25:list, idf:float) as values
         # For faster calculations, intialize array with numpy
