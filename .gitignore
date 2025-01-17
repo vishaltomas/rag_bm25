@@ -1,2 +1,5 @@
 support/nltk_data
 rag.ipynb
+sample.py
+__pycache__
+samples

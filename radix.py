@@ -98,10 +98,8 @@ class RadixTree:
 
 
 #  testing functions #
-def test():
+def test_radix():
   words = ["qwe", "qwert", "sdr", "abc","bnn","tuv", "bnu"]
   rt = RadixTree()
   rt.insert(words)
   print([node.el for node in rt.ROOT.children[1].children])
-
-test()
