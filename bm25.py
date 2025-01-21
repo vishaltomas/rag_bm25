@@ -131,8 +131,33 @@ class BM25:
     def store_index(self):
         # store the values in a file which is suitable for fast retreival and updating the data
         rt = RadixTree()
-        rt.insert(list(self.word.keys()))
-        
+        rt.insert(list(self.words.keys()))
+        # As of now we will store the tree as object file using pickle
+        try:
+            import pickle
+            if not os.path.exists('./support/cache'):
+                os.mkdir('./support/cache')
+            with open("./support/cache/radix_words.pickle", "wb") as file:
+                pickle.dump(rt, file, pickle.HIGHEST_PROTOCOL)
+        except Exception as e:
+            print("Error in saving words as radix tree: ",e)
+        # store list 
+        word_obj_ls = ['']*len(self.words)
+        # convert list to string
+        conv_ls = lambda l: ','.join([str(s) for s in l])
+        # get position of each word in lexicographical order 
+        for word in self.words.keys():
+            is_retreived, pos = rt.search(word=word)
+            if word_obj_ls[pos]:
+                print(word_obj_ls[pos], "\n current word: ", word)
+                break 
+            if is_retreived:
+                word_obj = self.words[word]
+                content = f"{conv_ls(word_obj.freq)}|{conv_ls(word_obj.doc)}|{conv_ls(word_obj.doclen)}|{word_obj.idf}|{conv_ls(word_obj.bm25)}"
+                word_obj_ls[pos] = content
+        with open("./support/cache/words.meta", "w") as file:
+            file.write("\n".join(word_obj_ls))
+
     def calc_scores(self, k1, b):
         # self.words contains words as keys and Word(name, freq:list, doc:list, doclen:list, bm25:list, idf:float) as values
         # For faster calculations, intialize array with numpy
@@ -161,5 +186,5 @@ def test():
     bm25 = BM25(file_ls=file_ls)
     bm25.ext_docs()
     bm25.calc_scores(k1=1.2, b=.75)
-    print(bm25.words['a'].bm25)
+    bm25.store_index()
 test()

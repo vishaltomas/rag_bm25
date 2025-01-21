@@ -78,10 +78,10 @@ class RadixTree:
             self.__binary_insert(curr_node, RadixNode(el=right_part, children=prev_children, is_leaf=False))
         cur_pos = word_len
   
-  def search(self, word:str)->bool:
+  def search(self, word:str)-> tuple[bool, int]:
     curr_node = self.ROOT
     cur_pos = 0
-    word_len = len(word) -1
+    word_len = len(word)
     while cur_pos < word_len:
       comp_str = curr_node.el
       while comp_str and cur_pos < word_len:
@@ -89,13 +89,12 @@ class RadixTree:
           break
         cur_pos += 1
         comp_str = comp_str[1:]
-      if cur_pos != word_len -1:
+      if cur_pos != word_len:
         if comp_str or curr_node.is_leaf:
-          return False
+          return (False,-1)
+      # check the children of the node
         _, _, curr_node = self.__binary_search(curr_node, word[cur_pos:])
-    return True
-  
-
+    return (True, -1)
 
 #  testing functions #
 def test_radix():
@@ -103,3 +102,6 @@ def test_radix():
   rt = RadixTree()
   rt.insert(words)
   print([node.el for node in rt.ROOT.children[1].children])
+  print(rt.search("bnm"))
+
+test_radix()
