@@ -10,6 +10,7 @@ class RadixNode:
 class RadixTree:
   def __init__(self):
     self.ROOT = RadixNode(is_leaf=True)
+    self.is_posit_calc = False
 
   def __binary_search(self, node:RadixNode, el:str) -> tuple[bool, int, RadixNode]:
     keys = node.children
@@ -113,9 +114,15 @@ class RadixTree:
         cur_pos = word_len
   
   def search(self, word:str)-> tuple[bool, int]:
+    if not self.is_posit_calc:
+        print("Positions are not calculated, please execute get_pos()", )
+        return (False, -1)
+        
     curr_node = self.ROOT
     cur_pos = 0
+    word_pos = -1
     word_len = len(word)
+    comp_str = ""
     while cur_pos < word_len:
       comp_str = curr_node.el
       while comp_str and cur_pos < word_len:
@@ -128,7 +135,10 @@ class RadixTree:
           return (False,-1)
       # check the children of the node
         _, _, curr_node = self.__binary_search(curr_node, word[cur_pos:])
-    return (True, -1)
+    word_pos = len(curr_node.el) - len(comp_str) - 1
+    if curr_node.word_end_pos[word_pos]:
+        return (True, curr_node.word_end_pos[word_pos])
+    return (False, -1)
 
   def get_pos(self):
     # Here we will update word_end_pos
@@ -145,6 +155,7 @@ class RadixTree:
         if curr_node.children:
             for child in reversed(curr_node.children):
                 child_stack.append(child)
+    self.is_posit_calc = True
 
 #  testing functions #
 def test_radix():
@@ -152,6 +163,7 @@ def test_radix():
   rt = RadixTree()
   rt.insert(words)
   rt.get_pos()
-  print([node.word_end_pos for node in rt.ROOT.children[1].children])
+  print([node.word_end_pos for node in rt.ROOT.children])
+  print(rt.search("sd"))
 
 test_radix()
