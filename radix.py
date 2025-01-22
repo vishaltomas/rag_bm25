@@ -1,10 +1,10 @@
 # Define structure of Radix tree node and its elements
 class RadixNode:
-  def __init__(self,el:str="",children:list=[],is_leaf:bool=False, word_end_flg:list=[]):
+  def __init__(self,el:str="",children:list=[],is_leaf:bool=False, word_end_pos:list=[]):
     self.el: str = el
     self.children: list[RadixNode] = children
     self.is_leaf: bool = is_leaf
-    self.word_end_flg: list = word_end_flg if word_end_flg else [0] * len(el)
+    self.word_end_pos: list = word_end_pos if word_end_pos else [0] * len(el)
 
 # Define structure for tree insert, delete and lookup
 class RadixTree:
@@ -57,7 +57,7 @@ class RadixTree:
   
   def __binary_insert(self, parent_node:RadixNode, child_node:RadixNode):
     if child_node.is_leaf:
-      child_node.word_end_flg[-1] = 1
+      child_node.word_end_pos[-1] = 1
     if parent_node.is_leaf:
       parent_node.is_leaf = False
       parent_node.children.append(child_node)
@@ -79,7 +79,7 @@ class RadixTree:
       while cur_pos < word_len:
         start_pos = cur_pos
         comp_str = curr_node.el
-        word_end_flg = curr_node.word_end_flg
+        word_end_pos = curr_node.word_end_pos
         while comp_str and cur_pos<word_len:
           if comp_str[0] != word[cur_pos]:
             break
@@ -104,13 +104,12 @@ class RadixTree:
             curr_node.el = left_part  
             prev_children = curr_node.children
             curr_node.children = prev_children[:cur_pos-start_pos]
-            curr_word_end_flg = curr_node.word_end_flg
-            curr_node.word_end_flg = curr_word_end_flg[:cur_pos-start_pos]
+            curr_word_end_pos = curr_node.word_end_pos
+            curr_node.word_end_pos = curr_word_end_pos[:cur_pos-start_pos]
             self.__binary_insert(curr_node, RadixNode(el=word[cur_pos:],is_leaf=True, children=[]))
-            self.__binary_insert(curr_node, RadixNode(el=right_part, children=prev_children, is_leaf=False, word_end_flg = curr_word_end_flg[cur_pos-start_pos+1:]))
+            self.__binary_insert(curr_node, RadixNode(el=right_part, children=prev_children, is_leaf=False, word_end_pos = curr_word_end_pos[cur_pos-start_pos:]))
         else:
-          print(f"word: {word}, position: {cur_pos-start_pos}")
-          word_end_flg[cur_pos-start_pos-1] = 1
+          word_end_pos[cur_pos-start_pos-1] = 1
         cur_pos = word_len
   
   def search(self, word:str)-> tuple[bool, int]:
@@ -132,17 +131,27 @@ class RadixTree:
     return (True, -1)
 
   def get_pos(self):
-    curr_node =self.ROOT
+    # Here we will update word_end_pos
+    node = self.ROOT
+    child_stack = []
+    child_stack.append(node)
+    curr_pos = 0
+    while child_stack:
+        curr_node = child_stack.pop()
+        for index in range(len(curr_node.word_end_pos)):
+            if curr_node.word_end_pos[index]:
+                curr_pos += curr_node.word_end_pos[index]
+                curr_node.word_end_pos[index] = curr_pos
+        if curr_node.children:
+            for child in reversed(curr_node.children):
+                child_stack.append(child)
 
 #  testing functions #
 def test_radix():
   words = ["qwe", "qwert", "sdr", "abc","bnn","tuv", "bnu", "bnm", "bn", "b"]
   rt = RadixTree()
   rt.insert(words)
-  print([node.el for node in rt.ROOT.children])
-  print([node.word_end_flg for node in rt.ROOT.children])
-  print([node.el for node in rt.ROOT.children[1].children])
-  print([node.word_end_flg for node in rt.ROOT.children[1].children])
-  print(rt.search("bnm"))
+  rt.get_pos()
+  print([node.word_end_pos for node in rt.ROOT.children[1].children])
 
 test_radix()
