@@ -213,7 +213,7 @@ class BM25:
     def topk(self, k:int) -> list[str]:
         self.score.values()
         for doc in self.score.keys():
-
+            pass
 
 
                 
