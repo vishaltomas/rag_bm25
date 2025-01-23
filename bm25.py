@@ -42,9 +42,13 @@ class BM25:
         # Key: token, Value: Word
         self.words = {}
         self.words_queue = Queue()
+        self.rt = RadixTree()
+        self.word_pos = []
         self.WORKER_THREADS = 10
         self.total_gathered = 0
-
+        self.rem_specials = lambda w: ''.join([c for c in w if c.isalnum()])
+        self.rem_special_words = lambda w: w.isalnum()
+        
     def collect_words_from_queue(self, event):
         while not event.is_set():        
             words, doc, doclen = self.words_queue.get()
@@ -66,10 +70,8 @@ class BM25:
         return
 
     def ext_metrics(self, file_path):
-        rem_specials = lambda w: ''.join([c for c in w if c.isalnum()])
-        rem_special_words = lambda w: w.isalnum()
-        vec_rem_special_words = np.vectorize(rem_special_words)
-        vec_rem_sp = np.vectorize(rem_specials)
+        vec_rem_special_words = np.vectorize(self.rem_special_words)
+        vec_rem_sp = np.vectorize(self.rem_specials)
         file_name = file_path.split("\\")[-1]
         # print("Extracting metrics from file: ", file_name)
         with open(file_path, encoding="utf-8") as file:
@@ -128,36 +130,7 @@ class BM25:
         idf = self.words[qi.lower()].idf
         return (idf*fqi*(k1+1)/(fqi + k1*(1-b+b*d/davgl)))
     
-    def store_index(self):
-        # store the values in a file which is suitable for fast retreival and updating the data
-        rt = RadixTree()
-        rt.insert(list(self.words.keys()))
-        # As of now we will store the tree as object file using pickle
-        try:
-            import pickle
-            if not os.path.exists('./support/cache'):
-                os.mkdir('./support/cache')
-            with open("./support/cache/radix_words.pickle", "wb") as file:
-                pickle.dump(rt, file, pickle.HIGHEST_PROTOCOL)
-        except Exception as e:
-            print("Error in saving words as radix tree: ",e)
-        # store list 
-        word_obj_ls = ['']*len(self.words)
-        # convert list to string
-        conv_ls = lambda l: ','.join([str(s) for s in l])
-        # get position of each word in lexicographical order 
-        for word in self.words.keys():
-            is_retreived, pos = rt.search(word=word)
-            if word_obj_ls[pos]:
-                print(word_obj_ls[pos], "\n current word: ", word)
-                break 
-            if is_retreived:
-                word_obj = self.words[word]
-                content = f"{conv_ls(word_obj.freq)}|{conv_ls(word_obj.doc)}|{conv_ls(word_obj.doclen)}|{word_obj.idf}|{conv_ls(word_obj.bm25)}"
-                word_obj_ls[pos] = content
-        with open("./support/cache/words.meta", "w") as file:
-            file.write("\n".join(word_obj_ls))
-
+    
     def calc_scores(self, k1, b):
         # self.words contains words as keys and Word(name, freq:list, doc:list, doclen:list, bm25:list, idf:float) as values
         # For faster calculations, intialize array with numpy
@@ -173,7 +146,79 @@ class BM25:
             return None
         idf_bm25_calc_vec = np.vectorize(idf_bm25_calc)
         idf_bm25_calc_vec(arr)
-        
+    def store_index(self):
+        import pickle
+        # store the values in a file which is suitable for fast retreival and updating the data
+        self.rt.insert(list(self.words.keys()))
+        # Initialize position for the words
+        self.rt.get_pos(self.words)
+        # As of now we will store the tree as object file using pickle
+        try:
+            if not os.path.exists('./support/cache'):
+                os.mkdir('./support/cache')
+            with open("./support/cache/radix_words.pickle", "wb") as file:
+                pickle.dump(self.rt, file, pickle.HIGHEST_PROTOCOL)
+        except Exception as e:
+            print("Error in saving words as radix tree: ",e)
+        # store list 
+        word_obj_ls = ['']*len(self.words)
+        # convert list to string
+        conv_ls = lambda l: ','.join([str(s) for s in l])
+        # get position of each word in lexicographical order 
+        for word in self.words.keys():
+            is_retreived, pos = self.rt.search(word=word)
+            if word_obj_ls[pos]:
+                print(word_obj_ls[pos], "\n current word: ", word)
+                break 
+            if is_retreived:
+                word_obj = self.words[word]
+                content = f"{conv_ls(word_obj.freq)}|{conv_ls(word_obj.doc)}|{conv_ls(word_obj.doclen)}|{word_obj.idf}|{conv_ls(word_obj.bm25)}"
+                word_obj_ls[pos] = content
+        with open("./support/cache/words.meta", "w") as file:
+            file.write("\n".join(word_obj_ls))
+        # To find the actual position of the content in file
+        word_ls_pos = [0]
+        for index, content in enumerate(word_obj_ls):
+            word_ls_pos.append(word_ls_pos[index - 1] + len(content) + 1)
+        word_ls_pos = word_ls_pos[1:]
+        with open("./support/cache/word_position.pickle") as file:
+            pickle.dump(word_ls_pos, file, pickle.HIGHEST_PROTOCOL)
+
+    def load_word_tree(self):
+        import pickle
+        # load radix tree and word position object
+        self.rt = pickle.load(file="./support/cache/radix_words.pickle")
+        self.word_pos = pickle.load(file="./support/cache/word_position.pickle")
+
+    def get_score(self, query:str) -> dict[str, int]:
+        self.load_word_tree()
+        words = word_tokenize(query)
+        words = filter(self.rem_special_words, words)       
+        words = self.rem_specials(words)
+        self.score = {}
+        prop_fd = open("./support/cache/words.meta","r")
+        for word in words:
+            is_retrieved, position = self.rt.search(word)
+            if is_retrieved:
+                begin_pos = self.word_pos[position]
+                end_pos = self.word_pos[position+1]
+                os.lseek(prop_fd, begin_pos+1, os.SEEK_SET)
+                prop_data = prop_fd.read(end_pos).split("|")
+                prop_bm25 = prop_data[-1].split(",")
+                # assign or add to the score for each document
+                for index,doc in prop_data[1].split(","):
+                    self.score[doc] = self.score.get(doc, 0) + prop_bm25[index]
+        return self.score
+
+    def topk(self, k:int) -> list[str]:
+        self.score.values()
+        for doc in self.score.keys():
+
+
+
+                
+
+    
         
 def test():
     _safety_import_()

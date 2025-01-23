@@ -140,17 +140,15 @@ class RadixTree:
         return (True, curr_node.word_end_pos[word_pos])
     return (False, -1)
 
-  def get_pos(self):
+  def get_pos(self, words:dict):
     # Here we will update word_end_pos
-    node = self.ROOT
-    child_stack = []
-    child_stack.append(node)
+    child_stack = [self.ROOT]
     curr_pos = 0
     while child_stack:
         curr_node = child_stack.pop()
         for index in range(len(curr_node.word_end_pos)):
             if curr_node.word_end_pos[index]:
-                curr_pos += curr_node.word_end_pos[index]
+                curr_pos += (curr_node.word_end_pos[index])
                 curr_node.word_end_pos[index] = curr_pos
         if curr_node.children:
             for child in reversed(curr_node.children):
