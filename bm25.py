@@ -211,14 +211,9 @@ class BM25:
         return self.score
 
     def topk(self, k:int) -> list[str]:
-        self.score.values()
-        for doc in self.score.keys():
-            pass
-
-
-                
-
-    
+        sort_val = sorted(self.score.items(), key = lambda item: item[1], reverse=True)
+        for index in range(k):
+            yield sort_val[index][0]
         
 def test():
     _safety_import_()
