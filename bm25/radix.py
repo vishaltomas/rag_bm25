@@ -164,18 +164,3 @@ class RadixTree:
     # print("Last pos : ",curr_pos)
     self.is_posit_calc = True
 
-#  testing functions #
-def test_radix():
-  with open("./sample_words.txt", "r", encoding="utf-8") as file:
-    words = file.read().split("\n")
-  words = words[:]
-  print("total words: ", len(words))
-  rt = RadixTree()
-  rt.insert(words)
-  rt.get_pos()
-  # print([node.el for node in rt.ROOT.children])
-  # print([node.word_end_pos for node in rt.ROOT.children])
-  print(rt.search("unas"))
-  print(rt.search("thao"))
-
-# test_radix()

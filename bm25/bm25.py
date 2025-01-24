@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from nltk import word_tokenize, data as nltk_data, download as nltk_download
 import os
 from queue import Queue
-from radix import RadixNode, RadixTree
+from rag.bm25.radix import RadixNode, RadixTree
 
 def _safety_import_():
     # Check whether imported modules work fine
@@ -227,23 +227,4 @@ class BM25:
         for index in range(k):
             yield sort_val[index][0]
         
-def test():
-    _safety_import_()
-    # file_path = os.path.join(".","samples","web")
-    # file_ls = []
-    # for (path,dirs,files) in os.walk(file_path):
-    #     for file in files:
-    #         file_ls.append(os.path.join(path,file))
-    # bm25 = BM25(file_ls=file_ls)
-    # bm25.ext_docs()
-    # bm25.calc_scores(k1=1.2, b=.75)
-    # bm25.store_index()
-    # del bm25
-    bm25 = BM25()
-    bm25.load_word_tree()
-    score = bm25.get_score("On a computer keyboard which letter on the same line is between C and B?")
-    print("\n----------\nTop K documents\n----------")
-    for doc in bm25.topk(k=7, score=score):
-        print(doc)
 
-test()
