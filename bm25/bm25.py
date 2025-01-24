@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from nltk import word_tokenize, data as nltk_data, download as nltk_download
 import os
 from queue import Queue
-from rag.bm25.radix import RadixNode, RadixTree
+from .radix import RadixTree
 
 def _safety_import_():
     # Check whether imported modules work fine
@@ -48,6 +48,7 @@ class BM25:
         self.total_gathered = 0
         self.rem_specials = lambda w: ''.join([c for c in w if c.isalnum()])
         self.rem_special_words = lambda w: w.isalnum()
+        self.CACHE_PATH = "./support/cache"
         
     def collect_words_from_queue(self, event):
         while not event.is_set():        
@@ -156,9 +157,9 @@ class BM25:
         self.rt.get_pos()
         # As of now we will store the tree as object file using pickle
         try:
-            if not os.path.exists('./support/cache'):
-                os.mkdir('./support/cache')
-            with open("./support/cache/radix_words.pickle", "wb") as file:
+            if not os.path.exists(self.CACHE_PATH):
+                os.mkdir(self.CACHE_PATH)
+            with open(f"{self.CACHE_PATH}/radix_words.pickle", "wb") as file:
                 pickle.dump(self.rt, file, pickle.HIGHEST_PROTOCOL)
         except Exception as e:
             print("Error in saving words as radix tree: ",e)
@@ -177,20 +178,20 @@ class BM25:
             else:
                 print(word)
 
-        with open("./support/cache/words.meta", "w") as file:
+        with open(f"{self.CACHE_PATH}/words.meta", "w") as file:
             file.write("\n".join(word_obj_ls))
         # To find the actual position of the content in file
         word_ls_pos = [0]
         for index, content in enumerate(word_obj_ls):
             word_ls_pos.append(word_ls_pos[index] + len(content) + 2)
-        with open("./support/cache/word_position.pickle", "wb") as file:
+        with open(f"{self.CACHE_PATH}/word_position.pickle", "wb") as file:
             pickle.dump(word_ls_pos, file, pickle.HIGHEST_PROTOCOL)
 
     def load_word_tree(self):
         import pickle
         # load radix tree and word position object
-        rt_fd = open("./support/cache/radix_words.pickle", "rb")
-        word_pos_fd = open("./support/cache/word_position.pickle", "rb")
+        rt_fd = open(f"{self.CACHE_PATH}/radix_words.pickle", "rb")
+        word_pos_fd = open(f"{self.CACHE_PATH}/word_position.pickle", "rb")
         self.rt = pickle.load(file=rt_fd)
         self.word_pos = pickle.load(file=word_pos_fd) 
         rt_fd.close()
@@ -202,7 +203,7 @@ class BM25:
         words = list(filter(self.rem_special_words, words))
         words = [self.rem_specials(word) for word in words]
         self.score = {}
-        prop_file = open("./support/cache/words.meta","rt")
+        prop_file = open(f"{self.CACHE_PATH}/words.meta","rt")
         prop_fd = prop_file.fileno()
         for word in words:
             is_retrieved, position = self.rt.search(word)
