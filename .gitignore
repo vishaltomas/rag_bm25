@@ -1,4 +1,5 @@
 support/nltk_data
+support/cache
 rag.ipynb
 sample.py
 __pycache__
