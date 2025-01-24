@@ -37,7 +37,7 @@ class Word:
     bm25: list = field(default_factory=list)
     
 class BM25:
-    def __init__(self, file_ls):
+    def __init__(self, file_ls:list=[]):
         self.files = file_ls
         # Key: token, Value: Word
         self.words = {}
@@ -151,7 +151,9 @@ class BM25:
         # store the values in a file which is suitable for fast retreival and updating the data
         self.rt.insert(list(self.words.keys()))
         # Initialize position for the words
-        self.rt.get_pos(self.words)
+        # with open("./sample_words", "w", encoding="utf-8") as file:
+            # file.write("\n".join(list(self.words.keys())))
+        self.rt.get_pos()
         # As of now we will store the tree as object file using pickle
         try:
             if not os.path.exists('./support/cache'):
@@ -167,64 +169,81 @@ class BM25:
         # get position of each word in lexicographical order 
         for word in self.words.keys():
             is_retreived, pos = self.rt.search(word=word)
-            if word_obj_ls[pos]:
-                print(word_obj_ls[pos], "\n current word: ", word)
-                break 
+            # print("word: ", word, " position: ",pos)
             if is_retreived:
                 word_obj = self.words[word]
                 content = f"{conv_ls(word_obj.freq)}|{conv_ls(word_obj.doc)}|{conv_ls(word_obj.doclen)}|{word_obj.idf}|{conv_ls(word_obj.bm25)}"
-                word_obj_ls[pos] = content
+                word_obj_ls[pos-1] = content
+            else:
+                print(word)
+
         with open("./support/cache/words.meta", "w") as file:
             file.write("\n".join(word_obj_ls))
         # To find the actual position of the content in file
         word_ls_pos = [0]
         for index, content in enumerate(word_obj_ls):
-            word_ls_pos.append(word_ls_pos[index - 1] + len(content) + 1)
-        word_ls_pos = word_ls_pos[1:]
-        with open("./support/cache/word_position.pickle") as file:
+            word_ls_pos.append(word_ls_pos[index] + len(content) + 2)
+        with open("./support/cache/word_position.pickle", "wb") as file:
             pickle.dump(word_ls_pos, file, pickle.HIGHEST_PROTOCOL)
 
     def load_word_tree(self):
         import pickle
         # load radix tree and word position object
-        self.rt = pickle.load(file="./support/cache/radix_words.pickle")
-        self.word_pos = pickle.load(file="./support/cache/word_position.pickle")
+        rt_fd = open("./support/cache/radix_words.pickle", "rb")
+        word_pos_fd = open("./support/cache/word_position.pickle", "rb")
+        self.rt = pickle.load(file=rt_fd)
+        self.word_pos = pickle.load(file=word_pos_fd) 
+        rt_fd.close()
+        word_pos_fd.close()
 
     def get_score(self, query:str) -> dict[str, int]:
         self.load_word_tree()
         words = word_tokenize(query)
-        words = filter(self.rem_special_words, words)       
-        words = self.rem_specials(words)
+        words = list(filter(self.rem_special_words, words))
+        words = [self.rem_specials(word) for word in words]
         self.score = {}
-        prop_fd = open("./support/cache/words.meta","r")
+        prop_file = open("./support/cache/words.meta","rt")
+        prop_fd = prop_file.fileno()
         for word in words:
             is_retrieved, position = self.rt.search(word)
+            # print("word: ", word, " position: ",position)
             if is_retrieved:
-                begin_pos = self.word_pos[position]
-                end_pos = self.word_pos[position+1]
-                os.lseek(prop_fd, begin_pos+1, os.SEEK_SET)
-                prop_data = prop_fd.read(end_pos).split("|")
+                begin_pos = self.word_pos[position-1] 
+                end_pos = self.word_pos[position]
+                # print("begin: ", begin_pos, "end: ", end_pos)
+                os.lseek(prop_fd, begin_pos, os.SEEK_SET)
+                prop_data = os.read(prop_fd, end_pos-begin_pos).decode("utf-8").rstrip("\n").rstrip("\r").split("|")
                 prop_bm25 = prop_data[-1].split(",")
+                # print(prop_data)
                 # assign or add to the score for each document
-                for index,doc in prop_data[1].split(","):
-                    self.score[doc] = self.score.get(doc, 0) + prop_bm25[index]
+                for index,doc in enumerate(prop_data[1].split(",")):
+                    self.score[doc] = self.score.get(doc, 0) + float(prop_bm25[index])
+        prop_file.close()            
+        # print(self.score)
         return self.score
 
-    def topk(self, k:int) -> list[str]:
-        sort_val = sorted(self.score.items(), key = lambda item: item[1], reverse=True)
+    def topk(self, k:int, score:dict) -> str:
+        sort_val = sorted(score.items(), key = lambda item: item[1], reverse=True)
         for index in range(k):
             yield sort_val[index][0]
         
 def test():
     _safety_import_()
-    import os
-    file_path = os.path.join(".","samples","web")
-    file_ls = []
-    for (path,dirs,files) in os.walk(file_path):
-        for file in files:
-            file_ls.append(os.path.join(path,file))
-    bm25 = BM25(file_ls=file_ls)
-    bm25.ext_docs()
-    bm25.calc_scores(k1=1.2, b=.75)
-    bm25.store_index()
+    # file_path = os.path.join(".","samples","web")
+    # file_ls = []
+    # for (path,dirs,files) in os.walk(file_path):
+    #     for file in files:
+    #         file_ls.append(os.path.join(path,file))
+    # bm25 = BM25(file_ls=file_ls)
+    # bm25.ext_docs()
+    # bm25.calc_scores(k1=1.2, b=.75)
+    # bm25.store_index()
+    # del bm25
+    bm25 = BM25()
+    bm25.load_word_tree()
+    score = bm25.get_score("On a computer keyboard which letter on the same line is between C and B?")
+    print("\n----------\nTop K documents\n----------")
+    for doc in bm25.topk(k=7, score=score):
+        print(doc)
+
 test()

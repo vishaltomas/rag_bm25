@@ -101,15 +101,16 @@ class RadixTree:
           elif left_part == "":
             self.__binary_insert(parent_node, RadixNode(el=word[cur_pos:],is_leaf=True, children=[]))
           else:            
-            
             curr_node.el = left_part  
             prev_children = curr_node.children
-            curr_node.children = prev_children[:cur_pos-start_pos]
+            curr_node.children = []
             curr_word_end_pos = curr_node.word_end_pos
             curr_node.word_end_pos = curr_word_end_pos[:cur_pos-start_pos]
             self.__binary_insert(curr_node, RadixNode(el=word[cur_pos:],is_leaf=True, children=[]))
             self.__binary_insert(curr_node, RadixNode(el=right_part, children=prev_children, is_leaf=False, word_end_pos = curr_word_end_pos[cur_pos-start_pos:]))
+          
         else:
+          
           word_end_pos[cur_pos-start_pos-1] = 1
         cur_pos = word_len
   
@@ -140,28 +141,41 @@ class RadixTree:
         return (True, curr_node.word_end_pos[word_pos])
     return (False, -1)
 
-  def get_pos(self, words:dict):
+  def get_pos(self):
     # Here we will update word_end_pos
     child_stack = [self.ROOT]
     curr_pos = 0
     while child_stack:
         curr_node = child_stack.pop()
+        # print("curr node: ",curr_node.el)
         for index in range(len(curr_node.word_end_pos)):
             if curr_node.word_end_pos[index]:
                 curr_pos += (curr_node.word_end_pos[index])
+                # print("pos: ", index ,"\nbefore: ",curr_node.word_end_pos[index])
                 curr_node.word_end_pos[index] = curr_pos
+                # print("after: ",curr_pos)
         if curr_node.children:
+            # print("Adding to stack")
             for child in reversed(curr_node.children):
                 child_stack.append(child)
+                # print(child.el)
+            # print("len of stack: ", len(child_stack))
+            # print("stack: ", [c.el for c in child_stack])
+    # print("Last pos : ",curr_pos)
     self.is_posit_calc = True
 
 #  testing functions #
 def test_radix():
-  words = ["qwe", "qwert", "sdr", "abc","bnn","tuv", "bnu", "bnm", "bn", "b"]
+  with open("./sample_words.txt", "r", encoding="utf-8") as file:
+    words = file.read().split("\n")
+  words = words[:]
+  print("total words: ", len(words))
   rt = RadixTree()
   rt.insert(words)
   rt.get_pos()
-  print([node.word_end_pos for node in rt.ROOT.children])
-  print(rt.search("sd"))
+  # print([node.el for node in rt.ROOT.children])
+  # print([node.word_end_pos for node in rt.ROOT.children])
+  print(rt.search("unas"))
+  print(rt.search("thao"))
 
-test_radix()
+# test_radix()
